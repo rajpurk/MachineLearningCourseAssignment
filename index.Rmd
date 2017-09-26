@@ -1,0 +1,107 @@
+---
+title: 'Predicting activity performed using fitness trackers '
+author: "Raj Purkayastha"
+date: "26 September 2017"
+output:
+  html_document:
+    keep_md: yes
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.width=4, fig.height=3)
+```
+## Executive Summary
+After an initial clean up of data we fit a random forest model to a portion of a training set. This is validated with data from the training set itself, and the accuracy and out of sample errors are indicated. Finally the sample is run on the test data to predict the outcome
+
+## Initial Data cleanup
+
+After reading the data of csv files, a preliminary examination shows that a large number of the columns have NA's in them and/or have empty data sets. We proceed to remove these columns. 
+
+```{r  Data clean up, echo = TRUE}
+{
+temptraining<-read.csv("pml-training.csv")
+temptesting<-read.csv("pml-testing.csv")
+
+training2<-temptraining[,which(as.numeric(colSums(!is.na(temptraining)))> 1000)]
+training<-training2[,which(as.numeric(colSums(training2==""))< 10000)]
+
+testing<-temptesting[,which(as.numeric(colSums(!is.na(temptesting)))> 5)]
+
+}
+```
+
+After this is done, we proceed to divide the set into a training and validation set using the caret package.
+```{r  Training and Validation set, echo = TRUE,message=FALSE,warning=FALSE}
+{
+library(caret)
+set.seed(1331)
+
+inTrain<-createDataPartition(y=training$classe,p=0.7,list=FALSE)
+mytraining<-training[inTrain,]
+validation<-training[-inTrain,]
+
+}
+```
+
+## Fitting the model
+We fit two models to the cleaned data in order to assess which model performs better. A cross validation technique is used. The fit model is then applied to the validation data set.
+
+```{r  model fit generation, echo = TRUE,message=FALSE,warning=FALSE}
+{
+#fit models in
+modFit_rf<-train(classe~.,method="rf",data=mytraining, trControl=trainControl(method="cv"),number=10,na.action = na.omit)
+modFit_lda<-train(classe~.,method="lda",data=mytraining, trControl=trainControl(method="cv"),number=10)
+
+#predict using the models
+pred_rf<-predict(modFit_rf,validation)
+pred_lda<-predict(modFit_lda,validation)
+
+}
+```
+
+
+
+We now look at the confusion matrix of the data in order to look at the accuracy of the models.
+```{r  Confusion matrix and accuracyrf , echo = TRUE,message=FALSE,warning=FALSE}
+{
+# now look at confusion matrix for accuracy
+xtab_rf<-table(pred_rf,validation$classe)
+cm_rf<-confusionMatrix(xtab_rf)
+cm_rf
+
+}
+```
+
+We repeat the procedure for the lda model.
+
+```{r  Confusion matrix and accuracy, echo = TRUE,message=FALSE,warning=FALSE}
+{
+# now look at confusion matrix for accuracy
+
+xtab_lda<-table(pred_lda,validation$classe)
+cm_lda<-confusionMatrix(xtab_lda)
+cm_lda
+}
+```
+
+The results using the cross validation show that the accuracy for the random forests method is quite high, being very close to 1. The accuracy for the lda method is slightly lower at 0.99, but not by much. hence given the high values of the accuracy, we can safely use either method to generate a set.
+
+We now apply the prediction to the final dataset
+
+```{r  Final prediction output rf, echo = TRUE,message=FALSE}
+{
+#final prediction
+pred_final_rf<-predict(modFit_rf,testing)
+pred_final_lda<-predict(modFit_lda,testing)
+ 
+ 
+}
+```
+
+
+The final prediction values are C, A,B,A,A,D,C,B,A,A,B,C,B,A,E,D,A,B,B,B
+
+
+
